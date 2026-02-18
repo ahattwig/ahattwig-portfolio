@@ -1,0 +1,624 @@
+---
+title: "Cyclistic_Case_Study"
+author: "Alex Hattwig"
+date: "2025-10-09"
+output: html_document
+---
+
+
+## Cyclistic Bike-Share Case Study
+
+### 1. Statement of the Business Task
+
+The purpose of this data analysis is to study the difference in bicycle ride-share usage between casual riders and annual members of Cyclistic, a fictional bike-share company in Chicago. 
+
+“Casual riders” are defined as customers who purchase single-ride passes and full-day passes from the company, while annual members are defined as customers who purchase annual bike-share memberships from Cyclistic.
+The study is part of a proposed marketing initiative at Cyclistic to convert casual riders into annual members, because annual memberships are more profitable for the company. 
+
+The insights provided by this data analysis into how casual riders and annual members use Cyclistic’s bikes differently will potentially inform the answers to other questions the marketing initiative is seeking to answer, namely “Why would casual riders buy Cyclistic annual memberships?” and “How can Cyclistic use digital media to influence casual riders to become members?”
+
+The results of this data analysis will also play a role in the Cyclistic executive team’s decision whether to approve the proposed marketing plan. The executive team is described as “notoriously detail-oriented.”
+
+### 2. Description of data sources used
+
+For purposes of the fictional scenario of this capstone project, the data being used is first-hand, proprietary data collected by the Cyclistic company. In point of fact, the data for this Google Data Analytics capstone project is public data made available by Motivate International Inc. under this [license](https://divvybikes.com/data-license-agreement). It is actual ride-share trip information from the Chicago bike share company Divvy.
+
+In order to address data-privacy concerns, the data excludes the personally identifiable information of customers. This prevents the analysis from connecting pass purchases to credit card numbers to determine whether casual riders have purchased multiple passes, or if they live in the service area of Cyclistic’s bike share service.
+
+The data is to be initially found at <https://divvy-tripdata.s3.amazonaws.com/index.html>. The data is organized into .csv files contained in ZIP files, each containing a month’s worth of bike-share trip data going back to April 2020. Trip data for months prior to that are organized into quarterly files going back through 2018, half-yearly files for 2014 through 2017, and a full year’s trip data in one file for 2013.
+
+Per the instructions for this project, I downloaded the previous 12 months of available Cyclistic trip data, 202507-divvy-tripdata.zip through 202408-divvy-tripdata.zip. After checking the files with antivirus software, the files were moved to a subfolder named “Tripdata_csv_zip_folders” in my desktop project folder, where the contents of the 12 ZIP files were extracted. The 12 extracted .csv files were than copied to a new different subfolder named “Tripdate_csv_files” to work with, ensuring that I retained original untouched versions of the .csv files in their extracted folders.
+
+Afterwards I opened each .csv file in “Tripdate_csv_files” and gave them an initial examination. Between the 12 files there is data for over 5.5 million bike share trips, with September 2024 containing the most data (821,272 trips) and January 2025 containing the least (138,689 trips). Based on the initial examination of the .csv files, there is no immediate reason to suspect that the data contains biases or issues of credibility.
+Each of the 12 .csv files has the following columns:
+
+| Column | Explanation |
+|:--------|:-------------------|
+|ride_id |16-digit alphanumeric key |
+|rideable_type|Type of bike rented for trip, mostly containing "electric_bike" or "classic_bike" as values|
+|started_at|Datetime stamp at beginning of bike trip|
+|ended_at|Datetime stamp at end of bike trip|
+|start_station_name|Geographic name of bike share station from beginning of trip|
+|start_station_id|Numeric or alphanumeric id of starting bike share station|
+|end_station_name|Geographic name of bike share station from end of trip|
+|end_station_id|Numeric or alphanumeric id of ending bike share station|
+|start_lat|Latitude of starting bike share station|
+|start_lng|Longitude of starting bike share station|
+|end_lat|Latitude of ending bike share station|
+|end_lng|Longitude of ending bike share station|
+|member_casual|Indicates if rider is a Cyclistic member, or a casual rider purchasing a pass. Values are "member" or "casual".|
+
+I noticed some potential issues with the data during the initial examination of the .csv files. These will need to be better understood and possibly addressed during the cleaning phase:
+
+* Some rows are missing values in the start_station_name and start_station_id fields. Some other rows are missing values in end_station_name and end_station_id fields, while others are missing values in all four of these fields. However, all of these rows contain values for the latitudinal and longitudinal coordinates for the start and end of the trip.
+
+* Until June 2025, start_station_id and end_station_id values do not have consistent formatting. Some have 3-digit numeric values, some have 5-digit numeric values, some have hyphenated 5 digit alphanumeric values like “WL-008”, and some have 12-digit alphanumeric values like “KA1503000004”. A few other rows have station IDs like “chargingstx5” or “Corral 7”. However, in June 2025 and later, start_station_id and end_station_id are formatted consistently using an 8-digit alphanumeric value beginning in “CHI” and followed by 5 numbers.
+
+
+### 3. Description of Data Cleaning and Manipulation
+
+#### 3a Analysis of missing station names and IDs for potential data cleaning
+  To begin, I conducted some exploratory investigations on the issue of missing values in the start_station_name, start_station_id, end_station_name, and end_station_id fields by performing various sorts and filters on these fields in five of the files. The situation with these fields can be characterized as follows:
+  
+* If a start_station_name value is missing, the start_station_id is always missing and vice versa. The same applies to the end_station_name and end_station_id fields.
+
+* The vast majority of the rows with missing station data are for electric bikes.
+
+* In almost all cases, rows that have these missing values are not missing in other fields. There are a few exceptions with with missing end station values that are missing values in the end_lat and end_lng fields.
+
+* All rows with missing values in the start_station_name and start_station_id fields have a rideable_type value of “electric_bike”. Rows that have rideable_type = “classic_bike” do not have missing start station values.
+
+Given this set of circumstances, it is a reasonable hypothesis that most of these rows missing station name or ID values are not actually missing data, but are records of trips using electric bikes that did not start and/or stop at bike-share stations. 
+  
+In some cities, electric bikes can be picked up or left on sidewalks near the curbside. In other cities newer electric bikes don't need to be docked, but can be docked or locked to a charging station or designated post or bike rack. Since charging stations, posts and bike racks aren't stations, the station name information isn't generated. As such, these rows should not be presumed to be bad data and will not be deleted.
+
+
+#### 3b Analysis of inconsistent station IDs formatting for potential data cleaning
+  I conducted more exploratory sorting and filtering on five of the files to investigate the situation with station ID values having at least seven different formats among the 12 months’ worth of ride data. After this investigation the situation seems to be as follows:
+  
+* As mentioned earlier, all start_station_id and end_station_id values are formatted consistently using an 8-digit alphanumeric value beginning in “CHI” (e.g. CHI00274) starting in June 2025 and going forward. 
+
+* Station ID values for start and end stations for the prior ten months follow a variety of numeric and alphanumeric formats of varying lengths that may or may not include hyphens.
+
+* Whatever the format, start_station_id and end_station_id values are consistently applied to station names. For example, station ID “TA1307000136” is always consistently applied to Clark St & Wellington Ave station in both start_station_id and end_station_id for any spreadsheet prior to June 2025, and not applied to any other station.
+
+Overall the different ID formats do not seem to be the result of incorrect or corrupted data, but rather an ambiguous and evolving group of decisions about formatting conventions for station ID by the company. 
+  
+Possible cleaning responses to these fields could be to convert all station names to having their post-June 2025 “CHI” station IDs, removing the start_station_id and end_station_id fields altogether, or simply ignoring the ID columns in favor of the station name columns. However, before taking any further time with one of these tasks, it should be determined if station IDs, or any of the station columns, will be useful for answering the business question of this analysis.
+
+#### 3c Data import
+I then imported the 12 .csv files into a single dataset in RStudio Desktop.
+
+```{r importing 12 .csv files into dataset}
+library(tidyverse)
+
+# Defining path to data folder.
+data_path <- "C:/Users/KRBLACK1987/Desktop/Cyclistic_Bike_Share_Case_Study/data2"
+
+# Read all .csv files and combine them
+divvy_tripdata <- list.files(path = data_path,
+                             pattern = "*.csv",
+                             full.names = TRUE) %>%
+  lapply(read_csv, show_col_types = FALSE) %>%
+  bind_rows()
+
+# Glimpse the result
+glimpse(divvy_tripdata)
+
+```
+I now had one dataset with 5,611,500 rows to work with.
+
+
+#### 3d. Additional fields added
+As a next step I added the following fields to the dataset per the project instructions:
+
+| Column | Explanation |
+|:--------|:-------------------|
+|ride_length|Result of started_at value subtracted from ended_at value, formatted in difftime as minutes|
+|day_of_week|WEEKDAY function applied to started_at value, formatted as General for a with a range of 1 (Sunday) to 7 (Saturday)|
+
+A new ride_length column was created in difftime format as minutes:
+
+```{r creating new ride_length column}
+
+divvy_tripdata <- divvy_tripdata %>%
+  mutate (ride_length = as.numeric(difftime(ended_at, started_at, units = "mins")))
+
+glimpse(divvy_tripdata)
+```
+
+A new day_of_week column was created using the lubridate wday() function.
+
+```{r creating day of week column}
+
+divvy_tripdata <- divvy_tripdata %>%
+  mutate (day_of_week = wday(started_at))
+
+glimpse(divvy_tripdata)
+
+```
+
+#### 3e Deleting rows with oulier ride_length values
+
+My next step was to remove rows with extremely short and long 'ride_length' values. On the low end, I decided to delete anything shorter than 1 minute. It is noteworthy that Divvy has a policy of removing these trips as "potentially false starts or users trying to re-dock a bike to ensure it was secure". (See <https://divvybikes.com/system-data>)
+
+
+```{r removing rows with trips under one minute}
+remove_under_minute <- divvy_tripdata %>%
+  filter(ride_length >= 1)
+```
+
+```{r examining after < 1 minute removal}
+remove_under_minute %>%
+  arrange(ride_length) %>%
+  select(ride_length, started_at, ended_at, rideable_type, member_casual)%>%
+  print(n = 10)
+```
+This removed over 132K of rows with 'ride_length' of under 60 seconds
+
+In deciding where to make the cutoff for long trips, I settled on 3 hours as a more than reasonable upper limit for a leisurely recreational ride. While some longer trips in the data may have been actual rides, many may have been glitches in docking stations that didn't mark the end of a trip properly.
+
+```{r removing rows with trips over three hours}
+trip_data <- remove_under_minute %>%
+  filter(ride_length <= 180)
+```
+
+```{r examining after > three hour removal}
+trip_data %>%
+  arrange(desc(ride_length)) %>%
+  select(ride_length, started_at, ended_at, rideable_type, member_casual)%>%
+  print(n = 10)
+```
+This removed approximately 17K more rows.
+
+Afterwards I examined the dataset for other issues and performed a few more cleaning operations.
+
+``` {r deploying some packages}
+library("skimr")
+library("janitor")
+```
+
+``` {r skimming the data}
+skim_without_charts(trip_data)
+```
+
+``` {r glimpsing the data}
+glimpse(trip_data)
+```
+
+``` {r }
+head(trip_data)
+```
+
+``` {r}
+clean_names(trip_data)
+```
+
+``` {r }
+not_16_char_ride_id <- trip_data$ride_id[nchar(trip_data$ride_id) != 16]
+
+print(not_16_char_ride_id)
+```
+
+### 4. Analysis and visualization 
+
+#### 4a Evaluating station data for utility in answering business question
+As mentioned earlier, I put further cleaning of station name and station ID data on hold until the suitability of these columns for answering our business questions was assessed. Accordingly I did some preliminary examinations of the data at this point by looking at ride counts for each starting station based on membership type.
+
+```{r, }
+
+trip_data %>%
+  group_by(member_casual) %>%
+  summarize(count = n())
+
+agg_mc_ss <- aggregate(trip_data$member_casual, by=list(trip_data$member_casual, trip_data$start_station_name), FUN=length)
+
+#create more readable columns
+agg_mc_ss$ride_count <- agg_mc_ss$x
+agg_mc_ss$Rider_type <- agg_mc_ss$Group.1
+agg_mc_ss$Start_Station <- agg_mc_ss$Group.2
+
+#get rid of old columns
+agg_mc_ss$x <- NULL
+agg_mc_ss$Group.1 <- NULL
+agg_mc_ss$Group.2 <- NULL
+
+agg_mc_ss %>%
+  filter(Rider_type == "member")%>%
+  arrange(desc(ride_count))%>%
+  head(10)
+
+agg_mc_ss %>%
+  filter(Rider_type == "casual")%>%
+  arrange(desc(ride_count)) %>%
+  head(10)
+```
+The stations with the highest ride count for each rider type are:
+
+* Streeter Dr & Grand Ave  for casual riders (count = 45069)
+
+* Kingsbury St & Kinzie St for member riders (count = 31578) 
+
+These numbers are minuscule in the context of the context of the total ride counts for casual and member riders, comprising 2.3% of the total count for casual and 0.9% of the count for member. Given that there are over 1800 other stations existing in the dataset, all with even smaller proportions of the total, it is not likely that meaningful generalizations about overall casual and member behavior can be made based on these counts.
+
+This is made even less likely by the fact that many rides in the data are missing starting or ending stations. In addition, not all stations within this data are alike; some stations only have few docks and others have more than 50 docks. Since stations with more docks will get more usage, their total count numbers are more a reflection of station characteristics than casual or member ridership behavior.
+
+On the face of it, nothing significant for the business question will be gleaned from analyzing starting stations, or stations in general.
+
+#### 4b Analyzing casual vs. member ride behavior for length of bike rides overall
+
+Next I studied the question of trip length to see if casual and member riders had notable differences in how long their bike rides tend to be.
+
+```{r getting total count, median and mean for casual and member riders}
+
+## creating new column of rounded minutes
+trip_data <- trip_data %>%
+  mutate(ride_minutes = round(ride_length, digits = 0))
+
+##getting median for each ride type
+group_mc <- trip_data %>%
+  group_by(member_casual) %>%
+  summarise(total_count=n(), median(ride_minutes), mean(ride_minutes))
+group_mc
+```
+
+Member riders took shorter trips overall, with a median of 9 minutes and a mean of around 12 minutes. Casual riders took longer trips, with a median of 12 minutes and a mean of around 19 minutes. The difference between mean and median for both groups show a skew towards longer rides pulling the mean up, with casual riders showing more of this skew.
+
+```{r getting minutes with the highest count for casual and member riders }
+
+## aggregating member_casual with ride_minutes
+agg_rm_rt <- aggregate(trip_data$member_casual, by=list(trip_data$member_casual, trip_data$ride_minutes), FUN=length)
+
+## change name of x in agg_rm_rt
+agg_rm_rt$ride_count <- agg_rm_rt$x
+
+## change name of Group1
+agg_rm_rt$rider_type <- agg_rm_rt$Group.1
+
+## change name of Group2
+agg_rm_rt$ride_length <- agg_rm_rt$Group.2
+
+#get rid of old columns
+agg_rm_rt$x <- NULL
+agg_rm_rt$Group.1 <- NULL
+agg_rm_rt$Group.2 <- NULL
+
+agg_rm_rt %>% 
+  group_by(rider_type) %>% 
+  slice_max(order_by = ride_count, n = 1, with_ties = TRUE)
+```
+
+The mode for member ride length is at 5 minutes (max count 289,517), while for casual riders the ride length mode is at 6 minutes (max count 117,217).
+
+```{r unified ride length chart}
+
+## creating column chart
+##trying column
+ggplot(data=agg_rm_rt) +
+  geom_col(mapping = aes(x = ride_length, y = ride_count, fill = rider_type))+
+  facet_wrap(~rider_type, ncol = 1) +
+  labs(x = "Ride Length in Minutes", y = "Ride Count (in 100K increments)", 
+       title="Bike Trips By Ride Duration: Casual Vs. Member", 
+       subtitle ="Total Rides Under 3 Hours",
+       caption = "Data collected from August 2024 through July 2025")
+
+```
+
+
+
+The chart reflects the information shown in the medians and means discussed earlier. Member rides have their mode at 5 minutes and the median at 6, with mean pulled upwards to ~12 minutes due to outlying longer rides. Casual riders show an even greater proportion of longer rides with the mode at 6 minutes, the median at 12 minutes, and the mean around 19 minutes. The chart shows these longer rides extending to the three hour mark.
+
+While this chart is accurate, it doesn't show the information it's representing very well. To focus on showing the data better, I broke this chart up into two charts, one showing trips up to 60 minutes, and another showing trips from one hour to 3 hours long.
+
+
+```{r making visualization for trips 60 minutes and under }
+
+## filtering for trips 60 minutes or shorter
+agg_rm_rt_short <- agg_rm_rt %>%
+  filter(ride_length < 61)
+
+# column chart with 60 minute upper limit
+ggplot(data=agg_rm_rt_short) +
+  geom_col(mapping = aes(x = ride_length, y = ride_count, fill = rider_type)) +
+  facet_wrap(~rider_type, ncol = 1) +
+  labs(x = "Ride Length in Minutes", y = "Ride Count (in 100K increments)", 
+       title="Bike Trips By Ride Duration: Casual Vs. Member", 
+       subtitle ="Rides One Hour Or Less",
+       caption = "Data collected from August 2024 through July 2025")
+
+```
+
+This chart shows the earlier peak in member ride lengths and the faster decline in frequency for longer ride durations, while casual riders have a later and less sharp peak in ride length frequency and a longer extension into outlying long ride durations.
+
+
+```{r making visualization for trips 1 to 3 hours }
+
+## filtering for trips over 60 minutes
+agg_rm_rt_long <- agg_rm_rt %>%
+  filter(ride_length > 60)
+
+# column chart with rides over one hour in length
+ggplot(data=agg_rm_rt_long) +
+  geom_col(mapping = aes(x = ride_length, y = ride_count, fill = rider_type)) +
+  facet_wrap(~rider_type, ncol = 1) +
+  labs(x = "Ride Length in Minutes", y = "Ride Count (in thousands)", 
+       title="Bike Trips By Ride Duration: Casual Vs. Member", 
+       subtitle ="Rides Over One Hour",
+       caption = "Data collected from August 2024 through July 2025")
+
+```
+
+
+Casual riders take more trips over an hour long than member riders do, even though there are fewer casual riders overall in the data. Within the subset of trips that are over an hour long, casual riders take longer trips as well.
+
+#### 4c Analyzing casual vs. member ride behavior based on day of week
+The next step was to investigate how casual and member riders might differ with regard to what day of the week they took their bike trips.
+
+```{r, day of week analysis}
+##aggregate member_casual with day_of_week
+agg_mc_dow <- aggregate(trip_data$member_casual, by=list(trip_data$member_casual, trip_data$day_of_week), FUN=length)
+
+## change name of x
+agg_mc_dow$trip_count <- agg_mc_dow$x
+
+## change name of Group1
+agg_mc_dow$rider_type <- agg_mc_dow$Group.1
+
+## change name of Group2
+agg_mc_dow$day_of_week <- agg_mc_dow$Group.2
+
+##delete old columns
+agg_mc_dow$x <- NULL
+agg_mc_dow$Group.1 <- NULL
+agg_mc_dow$Group.2 <- NULL
+
+```
+
+and a column chart was created
+```{r bar chart of counts}
+ggplot(data=agg_mc_dow) +
+  geom_col(mapping = aes(x = day_of_week, y = trip_count, fill = rider_type))+
+  facet_wrap(~rider_type)+
+  labs(x = "Day of Week (1 = Sun, 7 = Sat)", y = "Trip Count (in 100K increments)", 
+       title="Bike Trips By Day Of The Week: Casual Vs. Member", 
+       caption = "Data collected from August 2024 through July 2025")
+```
+
+
+
+The column chart for casual members shows higher proportional bike usage on Sunday and Saturday, while the chart for members shows higher ride counts from Monday through Friday.  This would suggest that member riders tend to use their bike rides for weekday commutes to and from work, while casual riders tend to take weekend bike rides for recreational purposes.
+
+I performed some further analysis to see whether casual and member riders showed differences with regard to how long their bike rides were throughout the days of the week.
+
+```{r aggregating ride_length with member_casual and day_of_week}
+agg_rl_dow <- trip_data %>%
+  group_by(member_casual, day_of_week) %>%
+  summarize(
+    trip_count = n(),
+    median_ride_length = median(ride_length))
+
+agg_rl_dow
+```
+```{R charting median ride_length over the days of the week by rider_type}
+
+## change name of member_casual
+agg_rl_dow$rider_type <- agg_rl_dow$member_casual
+
+# first chart 
+ggplot(data=agg_rl_dow) +
+  geom_col(mapping = aes(x = day_of_week, y = median_ride_length, fill = rider_type))+
+  facet_wrap(~rider_type)+
+  labs(x = "Day of Week (1 = Sun, 7 = Sat)", y = "Median Trip Length (in minutes)", 
+       title="Bike Trip Length by Day Of The Week: Casual Vs. Member", 
+       caption = "Data collected from August 2024 through July 2025")
+```
+
+
+
+Casual riders show a pattern of taking longer bike trips on Saturdays and Sundays, while member rider tend toward a more consistent pattern of trip lengths throughout the entire week, showing only a slight increase in the median trip length on weekends. This adds weight to the hypothesis that member riders are using their bike rides for commuting and casual riders are taking rides for recreational purposes.
+
+
+
+#### 4d Analyzing casual vs. member ride behavior based on time of day
+Are there further differences in ride behavior between casual and member riders with regard to the time of day they start their rides? I performed some further analysis of the data in order to find out.
+
+
+```{R analysis for casual vs. member for time of day, based on start_of_trip}
+
+# getting the hour from started_at, and changing start_hour to time of day                                        
+tod_trip_data <- trip_data %>%
+  mutate (start_hour = hour(started_at)) %>%
+  mutate (start_tod = case_when(
+    start_hour >= 5 & start_hour < 9 ~ "Early Morning",
+    start_hour >= 9 & start_hour < 12 ~ "Late Morning",
+    start_hour >= 12 & start_hour < 15 ~ "Early Afternoon",
+    start_hour >= 15 & start_hour < 18 ~ "Late Afternoon",
+    start_hour >= 18 & start_hour < 21 ~ "Evening",
+    TRUE ~ "Night")) %>%
+  select(start_tod, member_casual, ride_length)
+
+
+##aggregating with member_casual and calculate count and median ride_length
+agg_tod_mc <- tod_trip_data %>%
+  group_by(member_casual, start_tod) %>%
+  summarize(
+    count = n(),
+    median_ride_length = median(ride_length)
+  ) %>%
+  ungroup()
+
+
+## changing Group.2 to be ordered correctly, instead of alphabetically
+ordered_tod_mc <- agg_tod_mc %>%
+  mutate (tod_ordered = factor(
+    start_tod, levels = c("Early Morning", 
+                        "Late Morning", 
+                        "Early Afternoon", 
+                        "Late Afternoon",
+                        "Evening",
+                        "Night")))%>%
+select(rider_type = member_casual, tod_ordered, count, median_ride_length)  
+
+## making a column chart to examine the results
+ggplot(data=ordered_tod_mc) +
+  geom_col(mapping = aes(x = tod_ordered, y = count, fill = rider_type)) +
+facet_wrap(~rider_type) +
+theme(axis.text.x = element_text(angle = 45)) +
+labs(x = "Time of Day", y = "Trip Count", 
+       title="Bike Trips By Time of Day: Casual Vs. Member", 
+       caption = "Data collected from August 2024 through July 2025")
+
+```
+
+
+
+The casual riders' pattern shows proportionally fewer rides started in the early morning, rising to peak ridership during the late afternoon, then dropping lower and lower into the evening and night. Member riders show a substantially different ridership pattern through the time of day, with far greater ridership taking place in the early morning and late afternoon. This adds further weight to the hypothesis that member riders are using their bike trips to commute to and from work, and casual members are not.
+
+
+```{R creating a chart for ride length based on time of day}
+ggplot(data = ordered_tod_mc) +
+  geom_col(mapping = aes(x = tod_ordered, y = median_ride_length, fill = rider_type)) +
+  facet_wrap(~rider_type) +
+  theme(axis.text.x = element_text(angle = 45)) +
+  labs(x = "Time of Day", y = "Median Ride Length (in minutes)",
+       title = "Bike Trip Length by Time of Day: Casual Vs. Member",
+       caption = "Data collected from August 2024 through July 2025")
+
+```
+
+
+
+Casual riders have shorter rides in the morning, and longer rides peaking in the early afternoon, with ride length tapering off into the late afternoon through evening and night. On the other hand member riders have fairly consistent ride lengths throughout the day and night.
+
+
+
+
+#### 4e Analyzing casual vs. member ride behavior based on time of the year
+Casual and member riders show different ridership patterns with regards to the day of the week, and the time of the day. Do they also show significantly different ride behavior when it comes to what time of the year it is?
+
+
+```{R rides by month for casual and member}
+# extracting month from started_at, and creating month abbreviation column
+trip_data <- trip_data %>%
+  mutate(
+    ride_month = month(started_at),
+    month_abb = month.abb[ride_month]
+  )
+
+# grouping by rider type and month, then getting ride count and median ride_length
+agg_mon_mc <- trip_data %>%
+  group_by(member_casual, month_abb) %>%
+  summarize(
+    count = n(),
+    med_ride_length = median(ride_length, na.rm = TRUE)
+  )
+
+## changing name of member_casual
+agg_mon_mc$rider_type <- agg_mon_mc$member_casual
+
+##ordering the months so they appear chronologically in the viz, not alphabetically
+ordered_mon_mc <- agg_mon_mc %>%
+  mutate(
+    month_abb = factor(
+      month_abb,
+      levels = c("Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul")
+    )
+  )
+
+# visual to see results on month vs. count
+ggplot(data = ordered_mon_mc) +
+  geom_col(mapping = aes(x = month_abb, y = count, fill = rider_type)) +
+  facet_wrap(~rider_type)
+
+```
+
+
+
+The patterns of casual and member riders over the course of the months from August 2024 through July 2025 were extremely similar, with both groups showing far greater ridership in summer months than winter months. Since this is not a variable where rider types showed different behavior, I did not investigate this relationship further and the chart was not titled and captioned for later use.
+
+I went on to investigate the relationship between the length of bike rides and the time of the year for casual and member riders. Would this also show similar patterns between the two rider types?
+
+```{R charting ride length against month}
+
+ggplot(data = ordered_mon_mc) +
+  geom_col(mapping = aes(x = month_abb, y = med_ride_length, fill = rider_type)) +
+  facet_wrap(~rider_type)+
+   labs(x = "Month", y = "Median Trip Length (in minutes)", 
+       title="Bike Trip Length by Month: Casual Vs. Member", 
+       caption = "Data collected from August 2024 through July 2025")
+
+
+```
+
+
+
+Although both casual and member riders tended to make longer rides in the summer and shorter rides in the winter, this pattern is far less pronounced in member riders. Unlike casual riders, who take far longer trips in summer overall than they do in winter, member riders show a greater consistency in ride length throughout the year, further supporting the notion that member riders use their bike rides to commute the same route in all four seasons.
+
+
+
+
+#### 4f Analyzing casual vs. member ride behavior for rideables used
+I did some further analysis to see if there were differences between casual and member riders with regard to which rideables they used. This is mostly a choice between electric bikes and classic bikes.
+
+```{r analysis analysis for casual vs. member for rideable type selected for trip}
+
+##aggregating member_casual with rideable_type
+agg_mc_rt <- aggregate(trip_data$member_casual, by=list(trip_data$member_casual, trip_data$rideable_type), FUN=length)
+
+## renaming the x column
+agg_mc_rt$ride_count <- agg_mc_rt$x
+
+## renaming Group.1
+agg_mc_rt$rider_type <- agg_mc_rt$Group.1
+
+## renaming Group.2
+agg_mc_rt$vehicle_type <- agg_mc_rt$Group.2
+
+##data vis to give it a look
+ggplot(data=agg_mc_rt) +
+  geom_col(mapping = aes(x = vehicle_type, y = ride_count, fill = rider_type)) +
+  facet_wrap(~rider_type)+
+  theme(axis.text.x = element_text(angle = 45))
+
+```
+
+
+The column chart shows similar behavior between casual and member riders in their rideable choices, with electric bikes being the most popular choice and classic bikes showing as a substantial second choice. Both rider groups show a small usage of electric scooters, which subsequent investigation showed as being only in the September 2024 data. 
+Since this is not an area showing differences in casual vs. member behavior, I did not investigate this relationship further and the chart was not titled and captioned for later use.
+
+
+
+### 5. Presentation and recommendations
+Within the context of this Google Data Analytics Certification capstone project, this data analysis is being prepared for stakeholders at the fictional bike-share Cyclistic. The stakeholders include the Cyclistic marketing analytics team, the Cyclistic executive team, and Lily Moreno, who is the director of marketing and my manager.
+
+Within this fictional context, the presentation of my findings would focus on four of the data visualizations that show the behavioral differences between casual and member customers of Cyclistic, while leaving the others out. This is in order to simplify the presentation, focus on answering the business question driving the data analysis, and telling the story within the data. The presentation would include:
+
+
+* "Bike Trips By Ride Duration: Casual Vs. Member, Rides One Hour Or Less"
+* "Bike Trips By Ride Duration: Casual Vs. Member, Rides Over One Hour"
+* "Bike Trips By Day Of The Week: Casual Vs. Member"
+* "Bike Trip Length By Day Of The Week: Casual Vs. Member"
+* "Bike Trips By Time of Day: Casual Vs. Member"
+* "Bike Trip Length By Time of Day: Casual Vs. Member"
+* "Bike Trip Length By Month: Casual Vs. Member"
+
+The presentation would briefly mention that rideable type usage and yearly ridership count patterns were also analyzed, and that no significant differences were found between member and casual customers were found. However, the data visualizations from these parts of the analysis would not be included in the presentation.
+
+The emphasis of the presentation would be the differences in behavior between casual and member riders. 
+
+Member riders make shorter bike trips, make more trips from Monday through Friday, and take more trips during early morning and late afternoon hours. The length of their bike trips shows a greater consistency throughout the day and throughout the week. All of this points towards member riders largely using Cyclistic bike-sharing for commuting to and from work. 
+
+Casual riders take longer bike trips, make more trips on Saturday and Sunday, and show a pattern of low morning usage that gradually increases into the afternoon. They take much longer trips in summer than they do in winter, longer trips on weekends than they do on weekdays, and longer trips in the late morning and afternoon hours. These factors show a strong tendency for casual riders to use Cyclistic bike-sharing for recreational bicycle riding.
+
+This answers the question "How do annual members and casual riders use Cyclistic bikes differently?" What remains is to make some recommendations to help address the two other questions guiding the future marketing program, namely “Why would casual riders buy Cyclistic annual memberships?” and “How can Cyclistic use digital media to influence casual riders to become members?”
+
+Looking at the results of the analysis and the behaviors of both rider types, the approach to take is to encourage casual riders to behave more like member riders, insofar as the latter have bike riding more integrated into their lives as a mode of transportation. In the presentation given at Cyclistic, the three recommendations towards achieving this would be:
+
+* Encourage casual riders to take more trips during weekdays. One way to implement this would be email promotions offering discounts for single-use or day passes for the two slowest days for casual riders, Tuesday and Wednesday.
+
+* Encourage casual riders to take more frequent, shorter trips for non-recreational purposes. This could be attempted via promotions offering discounts for buying 10-packs of single-use passes, coupled with marketing campaign emphasizing Cyclistic's ease of use for shopping trips, pointing out stations close to grocery stores, drugstores, and hardware stores.
+
+* Encourage casual riders (and the general public) to commute to and from work using bicycles. This could be accomplished by means of a broad marketing campaign encouraging bicycle commuting, emphasizing Cyclistic memberships for ease of use and cost-effectiveness.
+
+I would also recommend gathering more data for further analysis, either within the presentation or in a 1:1 meeting with Lily Moreno. In particular I would suggest getting demographic and geographical data about Cyclistic customers in order to develop customer profiles.
+
