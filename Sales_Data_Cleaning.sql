@@ -90,8 +90,8 @@ OR Price = ''
 # Is it possible to reconstruct missing Item values by looking at Price values, and vice-versa?
 SELECT DISTINCT(Item), Price
 FROM cafe_sales
-WHERE Item != '' 
-AND PRICE != ''
+WHERE Item IS NOT NULL 
+AND PRICE IS NOT NULL 
 ORDER BY Price ASC
 ;
 # Cookie	1.0
